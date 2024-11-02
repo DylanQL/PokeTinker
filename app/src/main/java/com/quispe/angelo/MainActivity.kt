@@ -1,17 +1,9 @@
 package com.quispe.angelo
-
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import com.quispe.angelo.databinding.ActivityMainBinding
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : AppCompatActivity() {
 
@@ -21,44 +13,33 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding : ActivityMainBinding
 
+    private val viewModel by lazy { MainViewModel() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.rvTinderPokemon.adapter = adapter
-        getAllPokemons()
+        observeValues()
     }
 
-    private fun getRetrofit(): Retrofit {
-        val httpClient = OkHttpClient.Builder().addInterceptor { chain ->
-            val newRequest = chain.request().newBuilder()
-                .addHeader("Content-Type", "application/json")
-                .addHeader("NAME-HEADER", "VALUE-HEADER")
-                .build()
-            chain.proceed(newRequest)
+    private fun observeValues() {
+        viewModel.isLoading.observe(this) { isLoading ->
+            binding.progressBar.isVisible = isLoading
         }
 
-        val client = httpClient.build()
+        viewModel.pokemonList.observe(this) { pokemonList ->
+            adapter.list = pokemonList
+            adapter.notifyDataSetChanged()
+        }
 
-        return Retrofit.Builder()
-            .baseUrl("https://pokeapi.co")
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(client)
-            .build()
+        viewModel.errorApi.observe(this) { errorMessage ->
+            showMessage(errorMessage)
+        }
     }
 
-    private fun getAllPokemons() {
-        CoroutineScope(Dispatchers.IO).launch {
-            val request = getRetrofit().create(PokemonApi::class.java).getPokemons()
-            if (request.isSuccessful) {
-                request.body()?.let {
-                    runOnUiThread {
-                        adapter.list = it.results
-                        adapter.notifyDataSetChanged()
-                    }
-                }
-            }
-        }
+    private fun showMessage(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }
+
